@@ -2,16 +2,18 @@ import sys
 import os
 import time
 import subprocess
-
+import sysconfig
 # --- Configuration ---
 # Path to the directory where your .so module was built
 # This should be your 'PythonWrapper/ADCBoardControlPython/build' directory
-MODULE_BUILD_DIR = '/Users/saadalam/C++BoardControl/ADCBoardControlPython/build'
+MODULE_BUILD_DIR = os.path.join(os.path.dirname(__file__), 'build')
 
 # The expected name of your compiled module.
 # CMake produces this based on the module name in PYBIND11_MODULE and Python version/platform.
 # Your output showed: heinzinger_control.cpython-313-darwin.so
-MODULE_FILENAME = 'heinzinger_control.cpython-313-darwin.so'
+MODULE_FILENAME = (
+     'heinzinger_control' + sysconfig.get_config_var('EXT_SUFFIX')
+)
 PYTHON_MODULE_NAME = 'heinzinger_control' # Name used in "import heinzinger_control"
 CPP_CLASS_NAME_IN_PYTHON = 'HeinzingerPSU' # Name given in py::class_<...>(m, "HeinzingerPSU")
 
@@ -80,7 +82,7 @@ def setup_module_path_and_load():
         print(f"An unexpected error occurred during import: {e}")
         _module_loaded = False
 
-def initialize_psu(max_v=30000.0, max_c=2.0, verb=False, max_in_v=10.0):
+def initialize_psu(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
     """Initializes connection to the PSU."""
     global _psu_instance
     if not _module_loaded:
@@ -97,7 +99,7 @@ def initialize_psu(max_v=30000.0, max_c=2.0, verb=False, max_in_v=10.0):
             return False
             
         PSUClass = getattr(psu_module, CPP_CLASS_NAME_IN_PYTHON)
-        _psu_instance = PSUClass(max_voltage=max_v, max_current=max_c, verbose=verb, max_input_voltage=max_in_v)
+        _psu_instance = PSUClass(device_index=device_index, max_voltage=max_v, max_current=max_c, verbose=verb, max_input_voltage=max_in_v)
         print("PSU C++ object instance created successfully.")
         # The C++ constructor already tries to open the device.
         # A short delay might be good practice after initialization if the device needs it.
@@ -215,14 +217,13 @@ def cleanup_psu():
         print("PSU instance already None or not initialized.")
     return True
 
-def get_psu_instance(verb=False):
+def get_psu_instance(device_index=0, verb=False):
     """
     Ensure the PSU is ready and return the singleton instance.
-    Safe to call repeatedly.
     """
     if _psu_instance is None:
         setup_module_path_and_load()
-        initialize_psu(verb=verb)
+        initialize_psu(device_index=device_index, verb=verb)
     return _psu_instance
 
 
@@ -237,13 +238,13 @@ if __name__ == '__main__':
     print("\nAttempting to initialize PSU...")
     if _module_loaded:
         # Set C++ global Verbosity using the new setter function
-        heinzinger_control.set_cpp_verbosity_level(2) # Example: Set to 2 for detailed USB logs
+        #heinzinger_control.set_cpp_verbosity_level(2) # Example: Set to 2 for detailed USB logs
         # Read it back to confirm (optional)
-        current_cpp_verbosity = heinzinger_control.get_cpp_verbosity_level()
-        print(f"Set C++ global Verbosity to: {current_cpp_verbosity}")
-    print("\nAttempting to initialize PSU...")
+        #current_cpp_verbosity = heinzinger_control.get_cpp_verbosity_level()
+        #print(f"Set C++ global Verbosity to: {current_cpp_verbosity}")
+        print("\nAttempting to initialize PSU...")
     # Pass verbose=True to see AnalogPSU.h logs (this sets FGAnalogPSUInterface::Verbose member)
-    if initialize_psu(verb=True): # globally turn off C++ Logs
+    if initialize_psu(device_index=0,verb=True): # globally turn off C++ Logs
         print("PSU initialized successfully from Python.")
         try:
             print("\n--- PSU Control Interface ---")

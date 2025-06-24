@@ -23,6 +23,7 @@
 
 // Constructor Implementation
 HeinzingerVia16BitDAC::HeinzingerVia16BitDAC(
+    int device_index,
     double max_voltage,
     double max_current_param, // Renamed parameter to avoid confusion if a
                               // member was named max_current
@@ -37,6 +38,10 @@ HeinzingerVia16BitDAC::HeinzingerVia16BitDAC(
       max_analog_in_volt_bin(0) // Initialize this too
 // Interface member (FGAnalogPSUInterface) is default-constructed
 {
+  Interface.Close();                              // ensure nothing is open
+  if (!Interface.Bridge.OpenDevice(0xA0A0, 0x000C, device_index)) {
+    Utter("Unable to open USB device #" + std::to_string(device_index));
+  }
   if (!Interface) {
     Utter("Unable to open interface to analog PSU interface board.\n");
     // Consider throwing an exception here for better error handling in Python

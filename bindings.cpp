@@ -18,7 +18,8 @@ PYBIND11_MODULE(heinzinger_control, m) {
   m.doc() = "Python bindings for Heinzinger Power Supply Control";
 
   py::class_<HeinzingerVia16BitDAC>(m, "HeinzingerPSU")
-      .def(py::init<double, double, bool, double>(),
+      .def(py::init<int, double, double, bool, double>(),
+           py::arg("device_index")    = 0,
            py::arg("max_voltage") = 50000.0,
            py::arg("max_current") = 0.0005, // 0.5 mA
            py::arg("verbose") =
@@ -40,6 +41,8 @@ PYBIND11_MODULE(heinzinger_control, m) {
            "Sets the voltage to its maximum configured value.")
       .def("set_max_curr", &HeinzingerVia16BitDAC::set_max_curr,
            "Sets the current limit to its maximum configured value.")
+      .def("is_relay_on", &HeinzingerVia16BitDAC::is_relay_on,
+         "Return True if the PSU output relay is closed (output ON).")
       .def("readADC", &HeinzingerVia16BitDAC::readADC,
            "Reads and prints raw ADC values (for debugging).");
 

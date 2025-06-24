@@ -25,12 +25,13 @@ private:
   double max_curr;
 
   bool verbose;
+  int _usbIndex;   // store which identical device to open
 
   bool update(); // This is a private helper
 
 public:
   // Constructor
-  HeinzingerVia16BitDAC(double max_voltage = 30000.0, double max_current = 2.0,
+  HeinzingerVia16BitDAC(int    device_index = 0, double max_voltage = 30000.0, double max_current = 2.0,
                         bool verbose = false, double max_input_voltage = 10.0);
 
   // Public interface methods
@@ -38,6 +39,11 @@ public:
   bool switch_off();
   bool set_voltage(double set_val);
   bool set_current(double set_val);
+  bool is_relay_on() const               // true => output enabled
+  {
+    return Interface.Relay_val != 0;   // Relay_val comes from the board
+  }
+
   double read_voltage();
   double read_current();
   bool set_max_volt();
