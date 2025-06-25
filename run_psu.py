@@ -17,8 +17,8 @@ MODULE_FILENAME = (
 PYTHON_MODULE_NAME = 'heinzinger_control' # Name used in "import heinzinger_control"
 CPP_CLASS_NAME_IN_PYTHON = 'HeinzingerPSU' # Name given in py::class_<...>(m, "HeinzingerPSU")
 
-# --- Global variable for PSU instance ---
-_psu_instance = None
+# --- Global variables for PSU instances ---
+_psu_instances = {}  # Dictionary to store multiple PSU instances
 _module_loaded = False
 
 def setup_module_path_and_load():
