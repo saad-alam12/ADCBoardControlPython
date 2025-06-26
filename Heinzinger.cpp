@@ -39,7 +39,8 @@ HeinzingerVia16BitDAC::HeinzingerVia16BitDAC(
 // Interface member (FGAnalogPSUInterface) is default-constructed
 {
   Interface.Close();                              // ensure nothing is open
-  if (!Interface.Bridge.OpenDevice(0xA0A0, 0x000C, device_index)) {
+  // FIX: Use interface 0 for all devices, pass device_index as Skip parameter
+  if (!Interface.Bridge.OpenDevice(0xA0A0, 0x000C, 0, device_index)) {
     Utter("Unable to open USB device #" + std::to_string(device_index));
   }
   if (!Interface) {

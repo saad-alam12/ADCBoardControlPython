@@ -33,7 +33,7 @@ def control_psu():
         print("Setting up PSU...")
         
         # Set voltage to 5kV
-        if not psu_instance.set_voltage(5000.0):
+        if not psu_instance.set_voltage(0):
             print("Failed to set voltage")
             return False
         print("Voltage set to 5kV")

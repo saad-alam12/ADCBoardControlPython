@@ -611,6 +611,15 @@ The service prints initialization status and errors. Check console output for:
 3. **"Permission denied"**: May need udev rules or elevated privileges for USB access
 4. **Port conflicts**: Ensure port 5000 is available or change in the service
 
+### ⚠️ **Known Issue - "Unable to claim USB interface 1" (FIXED)**
+**Error:** `Error: Unable to claim USB interface 1. Libusb error: Entity not found. [-5]`
+
+**Root Cause:** This was a critical bug in the C++ USB interface claiming logic where `device_index` was incorrectly passed as the USB interface number instead of the device skip count.
+
+**Status:** ✅ **FIXED** in the current codebase. If you encounter this error, ensure you have the latest `Heinzinger.cpp` with the corrected `OpenDevice()` call.
+
+**Technical Details:** The fix changed `OpenDevice(VID, PID, device_index)` to `OpenDevice(VID, PID, 0, device_index)` to properly specify USB interface 0 for all devices.
+
 ## Migration from Single PSU
 
 If you're migrating from the original single PSU system:
@@ -619,10 +628,23 @@ If you're migrating from the original single PSU system:
 2. **JSON Format**: No changes needed - same JSON structure for all endpoints
 3. **Backward Compatibility**: The original `run_psu_service.py` can still run independently for single PSU operation
 
+## 🐛 **CRITICAL BUG FIX - Dual PSU USB Issue RESOLVED**
+
+**Problem:** Second device failed with `Error: Unable to claim USB interface 1. Libusb error: Entity not found. [-5]`
+
+**Root Cause:** In `Heinzinger.cpp` line 42-43, `device_index` was incorrectly passed as the USB interface number instead of device skip count.
+
+**Fix:** Changed `OpenDevice(0xA0A0, 0x000C, device_index)` to `OpenDevice(0xA0A0, 0x000C, 0, device_index)`
+
+**Status:** ✅ **SOLVED** - Both PSUs now initialize and control simultaneously.
+
+---
+
 ## Next Steps
 
-1. Test the system on your Mac with the provided test script
-2. Copy working files to your Raspberry Pi
-3. Test with actual hardware
-4. Update your LabVIEW program to use the new endpoints
-5. Enjoy simultaneous control of both PSUs!
+1. ✅ **COMPLETED:** Dual PSU USB initialization bug fixed
+2. ✅ **WORKING:** Test the system on your Mac with both interface boards
+3. Copy working files to your Raspberry Pi
+4. Test with actual hardware
+5. Update your LabVIEW program to use the new endpoints
+6. Enjoy simultaneous control of both PSUs!

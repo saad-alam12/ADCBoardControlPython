@@ -33,6 +33,11 @@ public:
   // Constructor
   HeinzingerVia16BitDAC(int    device_index = 0, double max_voltage = 30000.0, double max_current = 2.0,
                         bool verbose = false, double max_input_voltage = 10.0);
+  
+  // Destructor - CRITICAL for USB resource cleanup
+  ~HeinzingerVia16BitDAC() {
+    Interface.Close();  // Properly release USB resources
+  }
 
   // Public interface methods
   bool switch_on();
