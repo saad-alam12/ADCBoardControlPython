@@ -620,6 +620,30 @@ The service prints initialization status and errors. Check console output for:
 
 **Technical Details:** The fix changed `OpenDevice(VID, PID, device_index)` to `OpenDevice(VID, PID, 0, device_index)` to properly specify USB interface 0 for all devices.
 
+### 💻 **Platform Differences - Mac vs Raspberry Pi**
+
+**Issue Discovered:** The dual PSU system works differently on Mac vs Raspberry Pi due to USB subsystem differences.
+
+**Mac Behavior:**
+- ✅ Both PSUs initialize in any order
+- ✅ More permissive USB resource sharing
+- ✅ Better USB driver isolation
+- ✅ Handles multiple libusb contexts gracefully
+
+**Raspberry Pi Behavior:**
+- ❌ Device 1 fails if initialized after Device 0
+- ❌ Stricter USB resource management
+- ❌ USB contexts don't release properly between devices
+- ✅ Works if Device 1 (FUG) initialized FIRST
+
+**Root Cause:** Pi's USB subsystem doesn't fully release libusb resources when the first device cleanup occurs, causing "Resource busy" errors for the second device.
+
+**Universal Solution:** Initialize devices in this order on both platforms:
+1. **Device 1 (FUG) FIRST** - needs clean USB state
+2. **Device 0 (Heinzinger) SECOND** - more tolerant of used USB state
+
+**Status:** ✅ **WORKING** on both Mac and Pi with unified initialization order.
+
 ## Migration from Single PSU
 
 If you're migrating from the original single PSU system:
@@ -644,7 +668,11 @@ If you're migrating from the original single PSU system:
 
 1. ✅ **COMPLETED:** Dual PSU USB initialization bug fixed
 2. ✅ **WORKING:** Test the system on your Mac with both interface boards
-3. Copy working files to your Raspberry Pi
-4. Test with actual hardware
-5. Update your LabVIEW program to use the new endpoints
-6. Enjoy simultaneous control of both PSUs!
+3. ✅ **COMPLETED:** Copy working files to your Raspberry Pi  
+4. ✅ **WORKING:** Test with actual hardware - both PSUs initialize successfully
+5. Update your LabVIEW program to use the new endpoints:
+   - Heinzinger: `http://pi_ip:5001/heinzinger/*`
+   - FUG: `http://pi_ip:5001/fug/*`
+6. Enjoy simultaneous control of both PSUs! 🎉
+
+**System Status:** ✅ **FULLY OPERATIONAL** on both Mac and Raspberry Pi

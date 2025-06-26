@@ -672,18 +672,18 @@ if __name__ == '__main__':
 
     print("\nTesting dual PSU initialization...")
     
-    # Test initializing two PSUs
-    print("\nInitializing Heinzinger PSU (device 0)...")
-    if initialize_psu(device_index=0, max_v=30000.0, max_c=2.0, verb=True):
-        print("Heinzinger PSU initialized successfully.")
-    else:
-        print("Failed to initialize Heinzinger PSU.")
-    
+    # Test initializing two PSUs - Pi-compatible order (works on both Mac and Pi)
     print("\nInitializing FUG PSU (device 1)...")
     if initialize_psu(device_index=1, max_v=50000.0, max_c=0.5, verb=True):
         print("FUG PSU initialized successfully.")
     else:
         print("Failed to initialize FUG PSU.")
+    time.sleep(3)
+    print("\nInitializing Heinzinger PSU (device 0)...")
+    if initialize_psu(device_index=0, max_v=30000.0, max_c=2.0, verb=True):
+        print("Heinzinger PSU initialized successfully.")
+    else:
+        print("Failed to initialize Heinzinger PSU.")
     
     print(f"\nTotal PSU instances: {len(_psu_instances)}")
     print(f"Device indices: {list(_psu_instances.keys())}")
