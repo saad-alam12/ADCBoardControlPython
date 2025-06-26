@@ -20,7 +20,38 @@ _psu_instances = {}  # Dictionary to store multiple PSU instances by device_inde
 _module_loaded = False
 
 def setup_module_path_and_load():
-    """Adds the build directory to Python's path and tries to load the module."""
+    """
+    Sets up and loads the special code needed to control PSU hardware.
+    
+    This program controls PSUs (Power Supply Units) using code written in C++
+    for better performance. Before we can use that C++ code from Python, we need
+    to load it like loading a library book from a specific shelf.
+    
+    This function does three main things:
+    1. Tells Python where to find the C++ code file (in the 'build' folder)
+    2. Checks that the code file actually exists there
+    3. Loads the C++ code so Python can use it
+    
+    Returns:
+        bool: True if everything loaded successfully, False if something went wrong
+    
+    What This Function Does:
+        - Adds the 'build' folder to Python's search path
+        - Looks for the compiled C++ module file (ends in .so on Linux/Mac)
+        - Imports the C++ code so other functions can use it
+        - Prints helpful messages about what's happening
+        - Sets a flag so we know the module is ready to use
+    
+    Common Problems:
+        - "Build directory not found" = The C++ code hasn't been compiled yet
+        - "Module file not found" = Compilation failed or file was moved
+        - "Failed to import" = The compiled code has missing dependencies
+    
+    Notes:
+        - Safe to call multiple times (won't reload if already loaded)
+        - Must be called before using any PSU control functions
+        - The C++ code file is created by compiling with cmake and make
+    """
     global _module_loaded
 
     if _module_loaded:
@@ -61,7 +92,44 @@ def setup_module_path_and_load():
         return False
 
 def initialize_psu(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
-    """Initializes connection to a PSU with specific device index."""
+    """
+    Initializes connection to a Power Supply Unit (PSU) with specific device index.
+    
+    This function creates a new PSU instance using the C++ class bound via pybind11,
+    configures it with the specified parameters, and stores it in the global instance
+    dictionary for later use. Each PSU is identified by its device_index to support
+    multiple concurrent PSU operations.
+    
+    Args:
+        device_index (int): Unique identifier for the PSU device (default: 0)
+                           Used to differentiate between multiple PSUs
+        max_v (float): Maximum voltage limit in millivolts (default: 30000.0 = 30V)
+                      Safety limit to prevent exceeding PSU voltage capabilities
+        max_c (int): Maximum current limit in amperes (default: 25A)
+                    Safety limit to prevent exceeding PSU current capabilities
+        verb (bool): Enable verbose logging for debugging (default: False)
+                    When True, provides detailed operation logs
+        max_in_v (float): Maximum input voltage in volts (default: 10.0V)
+                         Input voltage safety threshold
+    
+    Returns:
+        bool: True if PSU initialization successful, False otherwise
+    
+    Side Effects:
+        - Stores PSU instance in global _psu_instances dictionary
+        - Prints status messages to stdout
+        - Adds 100ms delay after successful initialization
+    
+    Raises:
+        AttributeError: If C++ class binding is not found
+        Exception: For any other initialization errors
+    
+    Notes:
+        - Prevents duplicate initialization of same device_index
+        - Requires _module_loaded to be True (call setup_module_path_and_load() first)
+        - Uses dynamic class loading via globals() and getattr()
+        - Compatible with pybind11 C++ bindings
+    """
     global _psu_instances
     
     if not _module_loaded:
@@ -107,7 +175,43 @@ def initialize_psu(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in_v
 
 def get_psu_instance(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
     """
-    Get PSU instance for specific device index, initializing if necessary.
+    Gets you a "handle" to control a specific PSU, setting it up if needed.
+    
+    Think of this like getting a remote control for a specific TV. If the remote
+    is already set up for that TV, it just gives you the remote. If not, it sets
+    up the remote first, then gives it to you.
+    
+    This is the easiest way to start controlling a PSU - it handles all the
+    setup work automatically.
+    
+    Args:
+        device_index (int): Which PSU you want (0 for first PSU, 1 for second, etc.)
+        max_v (float): Safety limit for voltage in millivolts (30000.0 = 30 volts max)
+        max_c (int): Safety limit for current in amperes (25 = 25 amps max)
+        verb (bool): Show detailed messages for troubleshooting (default: False)
+        max_in_v (float): Input voltage safety limit in volts (default: 10.0V)
+    
+    Returns:
+        object: A "PSU controller" object you can use to control the PSU
+                Returns None if something went wrong during setup
+    
+    Example:
+        # Get controller for the first PSU with safe 5V, 2A limits
+        psu = get_psu_instance(0, max_v=5000, max_c=2)
+        if psu:
+            print("PSU controller ready!")
+        else:
+            print("Failed to set up PSU controller")
+    
+    What Happens Automatically:
+        - Loads the C++ control code if not already loaded
+        - Sets up the PSU with your safety limits if not already done
+        - Gives you back the same controller if you call this again
+    
+    Notes:
+        - Always check if the returned value is None before using it
+        - Safe to call multiple times with the same device_index
+        - Each PSU (device_index) gets its own separate controller
     """
     if device_index not in _psu_instances:
         setup_module_path_and_load()
@@ -117,7 +221,52 @@ def get_psu_instance(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in
     return _psu_instances.get(device_index)
 
 def set_psu_voltage(device_index, voltage):
-    """Sets PSU voltage for specific device. Returns True on success, False on error."""
+    """
+    Sets how much electrical "pressure" (voltage) a PSU should output.
+    
+    Voltage is like water pressure in a pipe - higher voltage means more electrical
+    "pressure" that can push current through circuits. This function tells the PSU
+    "please output exactly this much voltage."
+    
+    The change happens immediately - as soon as you call this function, the PSU
+    starts outputting the new voltage level.
+    
+    Args:
+        device_index (int): Which PSU to control (0 for first PSU, 1 for second, etc.)
+        voltage (float): The voltage you want in millivolts
+                        (e.g., 3300 = 3.3 volts, 5000 = 5.0 volts)
+    
+    Returns:
+        bool: True if the voltage was set successfully, False if something went wrong
+    
+    Side Effects:
+        - PSU immediately changes its output voltage
+        - Connected devices will see the new voltage right away
+        - Prints status messages to help with troubleshooting
+    
+    Safety Warning:
+        - Make sure the voltage is safe for connected devices!
+        - Too much voltage can damage or destroy connected circuits
+        - Always double-check your voltage calculations
+    
+    Example:
+        # Set PSU #0 to output 3.3 volts (3300 millivolts)
+        success = set_psu_voltage(0, 3300)
+        if success:
+            print("Voltage set to 3.3V")
+        else:
+            print("Failed to set voltage - check PSU connection")
+    
+    Common Voltage Values:
+        - 3300 = 3.3V (common for microcontrollers)
+        - 5000 = 5.0V (common for logic circuits)
+        - 12000 = 12V (common for motors, fans)
+    
+    Notes:
+        - PSU must be set up first with initialize_psu() or get_psu_instance()
+        - Voltage must be within the safety limits set during PSU initialization
+        - Use millivolts to avoid decimal point errors
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -132,7 +281,48 @@ def set_psu_voltage(device_index, voltage):
         return False
 
 def read_psu_voltage(device_index):
-    """Reads PSU voltage for specific device."""
+    """
+    Asks a PSU "what voltage are you actually outputting right now?"
+    
+    This function measures the real voltage coming out of the PSU at this moment.
+    It's like using a multimeter to check the actual voltage - you might have
+    asked for 5.0V, but the PSU might be outputting 4.98V due to load or accuracy.
+    
+    This is useful for:
+    - Verifying the PSU is working correctly
+    - Checking if voltage drops under load
+    - Monitoring power supply stability
+    - Troubleshooting circuit problems
+    
+    Args:
+        device_index (int): Which PSU to read from (0 for first PSU, 1 for second, etc.)
+    
+    Returns:
+        float: The actual voltage being output right now (in millivolts)
+               (e.g., 3287.5 means 3.2875 volts actual output)
+    
+    Example:
+        set_psu_voltage(0, 5000)  # Ask for 5.0V
+        actual = read_psu_voltage(0)  # See what we actually get
+        print(f"Requested 5.0V, actually getting {actual/1000:.3f}V")
+        
+        # Check if voltage is close enough to what we wanted
+        if abs(actual - 5000) < 100:  # Within 0.1V
+            print("Voltage is accurate")
+        else:
+            print("Voltage is off - check connections or PSU")
+    
+    Possible Problems:
+        - RuntimeError: PSU not set up yet (call initialize_psu first)
+        - Communication errors: PSU disconnected or hardware problem
+        - May return 0 if PSU is turned off
+    
+    Notes:
+        - PSU must be set up first with initialize_psu() or get_psu_instance()
+        - This is a "read-only" operation - doesn't change any settings
+        - Takes a moment to communicate with PSU hardware
+        - Value might fluctuate slightly due to electrical noise
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -145,7 +335,40 @@ def read_psu_voltage(device_index):
         raise
 
 def set_psu_current(device_index, current):
-    """Sets PSU current limit for specific device."""
+    """
+    Sets the maximum current limit for a specific PSU device.
+    
+    A PSU (Power Supply Unit) can supply both voltage and current. This function
+    sets the maximum amount of electrical current (measured in amperes/amps) that
+    the PSU is allowed to output. This acts as a safety limit - if the connected
+    load tries to draw more current than this limit, the PSU will reduce voltage
+    to keep current at or below this limit.
+    
+    Think of it like a water faucet with a flow limiter - you're setting the
+    maximum flow rate, not the actual flow (which depends on what's connected).
+    
+    Args:
+        device_index (int): Which PSU you want to control (like PSU #0, PSU #1, etc.)
+        current (float): Maximum current in amperes (e.g., 2.5 means 2.5 amps max)
+                        Automatically converted to ensure compatibility
+    
+    Returns:
+        bool: True if the current limit was set successfully, False if something went wrong
+    
+    Side Effects:
+        - Changes the PSU's internal current limit setting immediately
+        - May cause voltage to drop if connected load tries to draw too much current
+        - Prints status messages to help with debugging
+    
+    Example:
+        set_psu_current(0, 2.0)  # Set PSU #0 to maximum 2 amps
+        set_psu_current(1, 0.5)  # Set PSU #1 to maximum 0.5 amps
+    
+    Notes:
+        - The PSU must be initialized first using initialize_psu()
+        - Current should be within the PSU's capabilities (set during initialization)
+        - This is a safety feature - actual current depends on what you connect to the PSU
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -158,7 +381,37 @@ def set_psu_current(device_index, current):
         return False
 
 def read_psu_current(device_index):
-    """Reads PSU current for specific device."""
+    """
+    Reads how much electrical current a specific PSU is currently supplying.
+    
+    This function asks the PSU "how much current are you supplying right now?"
+    and returns the answer. Current is measured in amperes (amps) and represents
+    the actual electrical current flowing from the PSU to whatever is connected to it.
+    
+    Think of it like checking the speedometer in a car - it tells you the current
+    speed, not the speed limit. Similarly, this tells you the actual current flow,
+    not the maximum current limit.
+    
+    Args:
+        device_index (int): Which PSU you want to read from (like PSU #0, PSU #1, etc.)
+    
+    Returns:
+        float: Current electrical current in amperes (e.g., 1.5 means 1.5 amps flowing)
+    
+    Raises:
+        RuntimeError: If the PSU hasn't been set up yet (need to call initialize_psu first)
+        Exception: If there's a communication problem with the PSU hardware
+    
+    Example:
+        current = read_psu_current(0)  # Read current from PSU #0
+        print(f"PSU is supplying {current} amps")
+    
+    Notes:
+        - The PSU must be initialized first using initialize_psu()
+        - Reading current doesn't change any PSU settings
+        - The value shows actual current flow, which depends on what's connected
+        - May be 0 if PSU is off or nothing is connected that draws current
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -171,7 +424,44 @@ def read_psu_current(device_index):
         raise
 
 def switch_psu_on(device_index):
-    """Turns the PSU output ON for specific device."""
+    """
+    Turns ON the electrical output of a specific PSU device.
+    
+    A PSU (Power Supply Unit) is like an electrical switch that can be turned on or off.
+    When OFF, it produces no electricity even if voltage/current are set. When ON,
+    it actively supplies electricity at the configured voltage and current levels.
+    
+    This function is like flipping a light switch to the "ON" position - it enables
+    the PSU to start supplying power to whatever is connected to its output terminals.
+    
+    Args:
+        device_index (int): Which PSU you want to turn on (like PSU #0, PSU #1, etc.)
+    
+    Returns:
+        bool: True if the PSU was turned on successfully, False if something went wrong
+    
+    Side Effects:
+        - PSU begins supplying electricity at its configured voltage/current settings
+        - Connected devices/circuits will receive power and may start operating
+        - PSU status indicators may change (LEDs, displays, etc.)
+    
+    Safety Warning:
+        - Make sure all connections are secure before turning on the PSU
+        - Verify voltage and current settings are appropriate for connected devices
+        - Be aware that connected devices will immediately receive power
+    
+    Example:
+        # First set up the PSU with safe settings
+        initialize_psu(0, max_v=5000, max_c=1.0)  # 5V, 1A max
+        set_psu_voltage(0, 3300)  # Set to 3.3V
+        set_psu_current(0, 0.5)   # Limit to 0.5A
+        switch_psu_on(0)          # Now turn it on - power flows!
+    
+    Notes:
+        - PSU must be initialized first using initialize_psu()
+        - Configure voltage and current BEFORE turning on for safety
+        - Use switch_psu_off() to turn off the power output
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -184,7 +474,45 @@ def switch_psu_on(device_index):
         return False
 
 def switch_psu_off(device_index):
-    """Turns the PSU output OFF for specific device."""
+    """
+    Turns OFF the electrical output of a specific PSU device.
+    
+    This function stops the PSU from supplying electricity, like turning off a light
+    switch. Even though the PSU is still connected and configured, no power flows
+    to connected devices until you turn it back on with switch_psu_on().
+    
+    Think of it as the "emergency stop" or "safe shutdown" for the power supply.
+    The PSU remembers its voltage and current settings, but stops outputting power.
+    
+    Args:
+        device_index (int): Which PSU you want to turn off (like PSU #0, PSU #1, etc.)
+    
+    Returns:
+        bool: True if the PSU was turned off successfully, False if something went wrong
+    
+    Side Effects:
+        - PSU stops supplying electricity immediately
+        - Connected devices/circuits lose power and may shut down
+        - PSU status indicators may change (LEDs, displays, etc.)
+        - Voltage and current settings are preserved for next time
+    
+    Safety Benefits:
+        - Safe way to cut power without unplugging cables
+        - Protects connected devices during connection changes
+        - Allows safe adjustment of settings while power is off
+    
+    Example:
+        switch_psu_off(0)  # Turn off PSU #0 - power stops flowing
+        # Now safe to change connections or settings
+        set_psu_voltage(0, 5000)  # Change voltage while safely off
+        switch_psu_on(0)   # Turn back on with new settings
+    
+    Notes:
+        - PSU must be initialized first using initialize_psu()
+        - This is the safe way to stop power output
+        - PSU settings (voltage, current limits) are not changed, just output disabled
+        - Always turn off before making connection changes
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -197,7 +525,42 @@ def switch_psu_off(device_index):
         return False
 
 def is_relay_on(device_index):
-    """Check if relay is on for specific device."""
+    """
+    Checks whether a specific PSU's internal relay/switch is currently ON or OFF.
+    
+    A relay is like an internal electrical switch inside the PSU. When the relay is ON,
+    the PSU can supply power to its output terminals. When the relay is OFF, no power
+    flows even if the PSU is configured and "switched on" - it's like having a second
+    safety switch inside the device.
+    
+    Think of it like checking whether a circuit breaker is in the ON or OFF position.
+    This function asks the PSU "is your internal power switch currently on?"
+    
+    Args:
+        device_index (int): Which PSU you want to check (like PSU #0, PSU #1, etc.)
+    
+    Returns:
+        bool: True if the internal relay is ON (power can flow)
+              False if the internal relay is OFF (no power output) or if there's an error
+    
+    Example:
+        if is_relay_on(0):
+            print("PSU #0 relay is ON - power can flow")
+        else:
+            print("PSU #0 relay is OFF - no power output")
+    
+    Common Use Cases:
+        - Safety check before connecting sensitive equipment
+        - Troubleshooting why a PSU isn't supplying power
+        - Verifying PSU state before making measurements
+        - Confirming proper shutdown after switch_psu_off()
+    
+    Notes:
+        - PSU must be initialized first using initialize_psu()
+        - This is a read-only check - it doesn't change the relay state
+        - Returns False if PSU communication fails (safer assumption)
+        - Relay state may be different from the main on/off switch state
+    """
     psu_instance = _psu_instances.get(device_index)
     if psu_instance is None:
         print(f"ERROR: PSU on device {device_index} not initialized.")
@@ -209,7 +572,48 @@ def is_relay_on(device_index):
         return False
 
 def cleanup_psu(device_index=None):
-    """Cleans up PSU resources. If device_index is None, cleans up all."""
+    """
+    Properly shuts down and releases PSU resources to prevent memory leaks.
+    
+    When you're done using PSU devices, it's important to "clean up" - this means
+    telling the computer to release the memory and resources that were being used
+    to control the PSUs. It's like closing a program properly instead of just
+    unplugging the computer.
+    
+    This function can clean up either one specific PSU or all PSUs at once.
+    
+    Args:
+        device_index (int, optional): Which PSU to clean up (like PSU #0, PSU #1, etc.)
+                                    If not provided (None), cleans up ALL PSUs
+    
+    Returns:
+        bool: Always returns True (cleanup is generally safe to attempt)
+    
+    Side Effects:
+        - Removes PSU instances from internal memory
+        - Frees up computer resources used for PSU control
+        - PSU hardware may remain in its last configured state
+        - After cleanup, you'll need to initialize again to use the PSU
+    
+    Example:
+        # Clean up just PSU #0
+        cleanup_psu(0)
+        
+        # Clean up all PSUs
+        cleanup_psu()  # or cleanup_psu(None)
+    
+    When to Use:
+        - At the end of your program before exiting
+        - When switching to a different PSU configuration
+        - If you encounter errors and want to start fresh
+        - As part of proper "shutdown" procedures
+    
+    Notes:
+        - Safe to call even if PSU wasn't initialized
+        - Safe to call multiple times
+        - Doesn't change PSU hardware settings, just releases software control
+        - Good programming practice to always clean up resources
+    """
     global _psu_instances
     if device_index is None:
         # Clean up all instances
@@ -227,7 +631,33 @@ def cleanup_psu(device_index=None):
 _psu_instance = None  # For backward compatibility
 
 def get_psu_instance_legacy(device_index=0, verb=False):
-    """Legacy function for backward compatibility with existing code."""
+    """
+    Gets a PSU instance using the old-style interface (for compatibility).
+    
+    This function exists to support older code that was written before this
+    multi-PSU system was created. "Legacy" means "old way of doing things" -
+    some existing programs might still use the old function names and expect
+    them to work the same way.
+    
+    Instead of using this function, new code should use get_psu_instance() directly.
+    
+    Args:
+        device_index (int): Which PSU device to get (default: 0 for first PSU)
+        verb (bool): Enable verbose/detailed logging (default: False)
+    
+    Returns:
+        object: PSU instance if successful, None if initialization fails
+    
+    Side Effects:
+        - Updates the global _psu_instance variable (for old code compatibility)
+        - May trigger PSU initialization if not already done
+    
+    Notes:
+        - This is provided only for backward compatibility
+        - New code should use get_psu_instance() instead
+        - Maintained to avoid breaking existing programs
+        - Uses simplified parameter set compared to full get_psu_instance()
+    """
     global _psu_instance
     _psu_instance = get_psu_instance(device_index=device_index, verb=verb)
     return _psu_instance
