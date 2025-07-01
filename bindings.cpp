@@ -18,13 +18,22 @@ PYBIND11_MODULE(heinzinger_control, m) {
   m.doc() = "Python bindings for Heinzinger Power Supply Control";
 
   py::class_<HeinzingerVia16BitDAC>(m, "HeinzingerPSU")
+      // New USB path-based constructor (preferred)
+      .def(py::init<const std::string&, double, double, bool, double>(),
+           py::arg("usb_path"),
+           py::arg("max_voltage") = 30000.0,
+           py::arg("max_current") = 2.0, 
+           py::arg("verbose") = false,
+           py::arg("max_input_voltage") = 10.0,
+           "Initialize PSU using USB path identification (recommended)")
+      // Legacy device_index constructor (for backward compatibility)
       .def(py::init<int, double, double, bool, double>(),
-           py::arg("device_index")    = 0,
+           py::arg("device_index") = 0,
            py::arg("max_voltage") = 50000.0,
            py::arg("max_current") = 0.0005, // 0.5 mA
-           py::arg("verbose") =
-               false, // This sets FGAnalogPSUInterface::Verbose member
-           py::arg("max_input_voltage") = 10.0)
+           py::arg("verbose") = false,
+           py::arg("max_input_voltage") = 10.0,
+           "Initialize PSU using device index (deprecated - use USB path instead)")
       .def("switch_on", &HeinzingerVia16BitDAC::switch_on,
            "Switches the PSU relay on.")
       .def("switch_off", &HeinzingerVia16BitDAC::switch_off,

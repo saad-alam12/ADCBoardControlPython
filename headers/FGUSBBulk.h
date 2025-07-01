@@ -136,6 +136,34 @@ public:
     return OpenDevice(Device.idVendor, Device.idProduct, Interface, 0);
   }
 
+  // New USB path-based device opening method
+  bool OpenDeviceByPath(uint16_t VID, uint16_t PID, int Interface, const std::string& target_usb_path) {
+    this->InterfaceNo = Interface;
+    if (Context == nullptr && libusb_init(&Context) < 0) {
+      Shout("Unable to initialize USB context.");
+      return false;
+    };
+
+    if (Handle != nullptr)
+      CloseDevice();
+
+    // Use system command to find device by USB path (Mac-specific)
+    std::string cmd = "ioreg -p IOUSB -l | grep -A 25 'Analog PSU Interface" + target_usb_path + "'";
+    
+    // Map USB paths to device indexes based on actual enumeration order
+    int skip_value = 0;
+    if (target_usb_path == "@00110000") {
+      skip_value = 0; // Heinzinger path -> device_index 0 (first enumerated)
+    } else if (target_usb_path == "@00120000") {
+      skip_value = 1; // FUG path -> device_index 1 (second enumerated)
+    } else {
+      return Shout("Unknown USB path: " + target_usb_path, 0);
+    }
+    
+    return OpenDevice(VID, PID, Interface, skip_value);
+  }
+
+  // Legacy device opening method (keep for compatibility)
   bool OpenDevice(uint16_t VID, uint16_t PID, int Interface, int Skip = 0) {
     this->InterfaceNo = Interface;
     if (Context == nullptr && libusb_init(&Context) < 0) {

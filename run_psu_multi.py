@@ -15,6 +15,11 @@ MODULE_FILENAME = (
 PYTHON_MODULE_NAME = 'heinzinger_control' 
 CPP_CLASS_NAME_IN_PYTHON = 'HeinzingerPSU'
 
+# --- USB Path Configuration ---
+# USB paths for reliable device identification (keep PSUs in same physical ports!)
+USB_PATH_HEINZINGER = "@00110000"  # Heinzinger PSU (30kV, no relay)
+USB_PATH_FUG = "@00120000"         # FUG PSU (50kV, with relay)
+
 # --- Global variables for PSU instances ---
 _psu_instances = {}  # Dictionary to store multiple PSU instances by device_index
 _module_loaded = False
@@ -89,6 +94,55 @@ def setup_module_path_and_load():
     except Exception as e:
         print(f"An unexpected error occurred during import: {e}")
         _module_loaded = False
+        return False
+
+def initialize_psu_by_path(usb_path, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
+    """
+    Initializes connection to a Power Supply Unit (PSU) using USB path identification.
+    
+    This function creates a new PSU instance using USB path-based identification
+    instead of device enumeration order, providing more reliable device selection.
+    
+    Args:
+        usb_path (str): USB path identifier (e.g., "@00110000" for Heinzinger, "@00120000" for FUG)
+        max_v (float): Maximum voltage limit in volts (default: 30000.0 = 30kV)
+        max_c (float): Maximum current limit in milliamps (default: 25mA)  
+        verb (bool): Enable verbose logging for debugging (default: False)
+        max_in_v (float): Maximum input voltage in volts (default: 10.0V)
+    
+    Returns:
+        bool: True if PSU initialization successful, False otherwise
+    """
+    global _psu_instances
+    
+    if not _module_loaded:
+        print("ERROR: Python module not loaded. Cannot initialize PSU.")
+        return False
+    
+    # Check if PSU for this USB path is already initialized
+    if usb_path in _psu_instances:
+        print(f"PSU at USB path {usb_path} already initialized.")
+        return True
+    
+    try:
+        # Get the C++ class from the imported module
+        cpp_module = globals()[PYTHON_MODULE_NAME]
+        cpp_class = getattr(cpp_module, CPP_CLASS_NAME_IN_PYTHON)
+        
+        # Create PSU instance using USB path
+        psu_instance = cpp_class(usb_path, max_v, max_c, verb, max_in_v)
+        
+        # Store the instance
+        _psu_instances[usb_path] = psu_instance
+        print(f"PSU at USB path {usb_path} initialized successfully.")
+        time.sleep(0.1)  # Small delay after initialization
+        return True
+        
+    except AttributeError as e:
+        print(f"ERROR: C++ class '{CPP_CLASS_NAME_IN_PYTHON}' not found in module '{PYTHON_MODULE_NAME}': {e}")
+        return False
+    except Exception as e:
+        print(f"ERROR: Failed to initialize PSU at USB path {usb_path}: {e}")
         return False
 
 def initialize_psu(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
@@ -219,6 +273,39 @@ def get_psu_instance(device_index=0, max_v=30000.0, max_c=25, verb=False, max_in
             return None
     
     return _psu_instances.get(device_index)
+
+def get_psu_instance_by_path(usb_path, max_v=30000.0, max_c=25, verb=False, max_in_v=10.0):
+    """
+    Gets a PSU controller using reliable USB path identification.
+    
+    This is the new, improved way to get PSU controllers that doesn't depend on
+    which device the computer finds first. Each PSU is identified by its specific
+    USB port location, making it much more reliable than device enumeration order.
+    
+    Args:
+        usb_path (str): USB path identifier - use USB_PATH_HEINZINGER or USB_PATH_FUG constants
+        max_v (float): Safety limit for voltage in volts (30000.0 = 30kV max)
+        max_c (float): Safety limit for current in milliamps (25 = 25mA max)  
+        verb (bool): Show detailed messages for troubleshooting (default: False)
+        max_in_v (float): Input voltage safety limit in volts (default: 10.0V)
+    
+    Returns:
+        object: A PSU controller object, or None if setup failed
+        
+    Example:
+        # Get Heinzinger PSU controller  
+        heinz = get_psu_instance_by_path(USB_PATH_HEINZINGER, max_v=30000, max_c=2.0)
+        
+        # Get FUG PSU controller
+        fug = get_psu_instance_by_path(USB_PATH_FUG, max_v=50000, max_c=0.5)
+    """
+    global _psu_instances
+    
+    # Try to initialize PSU if not already done
+    if not initialize_psu_by_path(usb_path, max_v, max_c, verb, max_in_v):
+        return None
+    
+    return _psu_instances.get(usb_path)
 
 def set_psu_voltage(device_index, voltage):
     """

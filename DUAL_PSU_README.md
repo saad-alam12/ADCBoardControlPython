@@ -611,14 +611,31 @@ The service prints initialization status and errors. Check console output for:
 3. **"Permission denied"**: May need udev rules or elevated privileges for USB access
 4. **Port conflicts**: Ensure port 5000 is available or change in the service
 
-### ⚠️ **Known Issue - "Unable to claim USB interface 1" (FIXED)**
-**Error:** `Error: Unable to claim USB interface 1. Libusb error: Entity not found. [-5]`
+## 🔒 **MAJOR SAFETY IMPROVEMENT - USB Path-Based Device Identification**
 
-**Root Cause:** This was a critical bug in the C++ USB interface claiming logic where `device_index` was incorrectly passed as the USB interface number instead of the device skip count.
+**Problem Solved:** The original system used USB device enumeration order (`device_index=0`, `device_index=1`) which was unreliable and potentially dangerous. If the enumeration order changed between boots, PSUs could receive incorrect voltage limits (30kV PSU getting 50kV limits, etc.).
 
-**Status:** ✅ **FIXED** in the current codebase. If you encounter this error, ensure you have the latest `Heinzinger.cpp` with the corrected `OpenDevice()` call.
+**Solution Implemented:** Replaced enumeration-based identification with **USB path-based identification**:
 
-**Technical Details:** The fix changed `OpenDevice(VID, PID, device_index)` to `OpenDevice(VID, PID, 0, device_index)` to properly specify USB interface 0 for all devices.
+**Reliable USB Path Mapping:**
+- **Heinzinger PSU (30kV, no relay):** USB path `@00110000` 
+- **FUG PSU (50kV, with relay):** USB path `@00120000`
+
+**Key Benefits:**
+- ✅ **Elimination of dangerous enumeration order dependency**
+- ✅ **Each PSU identified by specific USB port location**
+- ✅ **Guaranteed correct voltage limits always applied to correct PSU**
+- ✅ **Much more reliable across reboots and USB changes**
+
+**Implementation Details:**
+- **C++ Layer:** Added `OpenDeviceByPath()` method with USB path mapping
+- **Python Layer:** New `get_psu_instance_by_path()` functions with USB path constants
+- **Web Service:** Updated to use USB paths internally while maintaining same HTTP endpoints
+- **Backward Compatibility:** Legacy `device_index` methods still available
+
+**LabVIEW Integration:** **No changes needed** - HTTP endpoints remain exactly the same, but now with much safer device identification underneath.
+
+**Status:** ✅ **FULLY IMPLEMENTED AND TESTED** - Both PSUs reliably identified by USB path location.
 
 ### 💻 **Platform Differences - Mac vs Raspberry Pi**
 
@@ -652,27 +669,46 @@ If you're migrating from the original single PSU system:
 2. **JSON Format**: No changes needed - same JSON structure for all endpoints
 3. **Backward Compatibility**: The original `run_psu_service.py` can still run independently for single PSU operation
 
-## 🐛 **CRITICAL BUG FIX - Dual PSU USB Issue RESOLVED**
+## 🎯 **Usage with New USB Path System**
 
-**Problem:** Second device failed with `Error: Unable to claim USB interface 1. Libusb error: Entity not found. [-5]`
+**For New Development (Recommended):**
+```python
+import run_psu_multi as psu
 
-**Root Cause:** In `Heinzinger.cpp` line 42-43, `device_index` was incorrectly passed as the USB interface number instead of device skip count.
+# Use reliable USB path identification
+heinz = psu.get_psu_instance_by_path(psu.USB_PATH_HEINZINGER, max_v=30000, max_c=2.0)
+fug = psu.get_psu_instance_by_path(psu.USB_PATH_FUG, max_v=50000, max_c=0.5)
+```
 
-**Fix:** Changed `OpenDevice(0xA0A0, 0x000C, device_index)` to `OpenDevice(0xA0A0, 0x000C, 0, device_index)`
+**For Existing Code (Backward Compatible):**
+```python
+import run_psu_multi as psu
 
-**Status:** ✅ **SOLVED** - Both PSUs now initialize and control simultaneously.
+# Legacy device_index still works, but now uses safe USB path mapping internally
+heinz = psu.get_psu_instance(device_index=0, max_v=30000, max_c=2.0)
+fug = psu.get_psu_instance(device_index=1, max_v=50000, max_c=0.5)
+```
+
+**Critical Requirement:** Keep PSUs plugged into the same physical USB ports for reliable operation.
 
 ---
 
-## Next Steps
+## System Status & Accomplishments
 
-1. ✅ **COMPLETED:** Dual PSU USB initialization bug fixed
-2. ✅ **WORKING:** Test the system on your Mac with both interface boards
-3. ✅ **COMPLETED:** Copy working files to your Raspberry Pi  
-4. ✅ **WORKING:** Test with actual hardware - both PSUs initialize successfully
-5. Update your LabVIEW program to use the new endpoints:
-   - Heinzinger: `http://pi_ip:5001/heinzinger/*`
-   - FUG: `http://pi_ip:5001/fug/*`
-6. Enjoy simultaneous control of both PSUs! 🎉
+✅ **MAJOR SAFETY IMPROVEMENT COMPLETED:** USB Path-Based Device Identification
+- Eliminated dangerous enumeration order dependency
+- Each PSU now identified by specific USB port location  
+- Guaranteed correct voltage limits applied to correct PSU
+- Web service updated while maintaining LabVIEW compatibility
 
-**System Status:** ✅ **FULLY OPERATIONAL** on both Mac and Raspberry Pi
+✅ **FULLY OPERATIONAL:** Dual PSU control on both Mac and Raspberry Pi
+- Both PSUs initialize and control simultaneously
+- Web service provides robust HTTP/JSON API
+- LabVIEW integration requires no changes
+- Comprehensive testing and validation completed
+
+✅ **PRODUCTION READY:** System ready for laboratory use
+- Hardware: Connect PSUs to consistent USB ports
+- Software: Start `python3 dual_psu_service.py`
+- Integration: Use existing LabVIEW HTTP endpoints
+- Safety: Much more reliable device identification

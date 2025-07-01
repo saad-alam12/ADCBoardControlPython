@@ -21,31 +21,65 @@
 
 // --- Method Definitions for HeinzingerVia16BitDAC ---
 
-// Constructor Implementation
+// New USB path-based constructor implementation
 HeinzingerVia16BitDAC::HeinzingerVia16BitDAC(
-    int device_index,
+    const std::string& usb_path,
     double max_voltage,
-    double max_current_param, // Renamed parameter to avoid confusion if a
-                              // member was named max_current
+    double max_current_param,
     bool verbose_param,
     double max_input_voltage)
     : max_volt(max_voltage),                 // Initialize from parameter
       max_curr(max_current_param),           // Initialize from parameter
       verbose(verbose_param),                // Initialize from parameter
       max_analog_in_volt(max_input_voltage), // Initialize from parameter
-      // Initialize cache members defined in Heinzinger.h
       set_volt_cache(0.0), set_curr_cache(0.0), relay_cache(false),
-      max_analog_in_volt_bin(0) // Initialize this too
-// Interface member (FGAnalogPSUInterface) is default-constructed
+      max_analog_in_volt_bin(0), _usbIndex(0) // Initialize _usbIndex to 0 for path-based
 {
-  Interface.Close();                              // ensure nothing is open
-  // FIX: Use interface 0 for all devices, pass device_index as Skip parameter
+  Interface.Close(); // ensure nothing is open
+  // Use new path-based device opening
+  if (!Interface.Bridge.OpenDeviceByPath(0xA0A0, 0x000C, 0, usb_path)) {
+    Utter("Unable to open USB device at path: " + usb_path);
+  }
+  if (!Interface) {
+    Utter("Unable to open interface to analog PSU interface board.\n");
+  }
+
+  Interface.Verbose = this->verbose; // Set interface verbosity
+  
+  if (BOARD_MAX_VOLT < this->max_analog_in_volt) {
+    Utter("The board has insufficient output voltage to control the PSU");
+  }
+
+  // Initialize the max_analog_in_volt_bin from max_analog_in_volt
+  max_analog_in_volt_bin = static_cast<uint16_t>(
+      UINT16_MAX * (this->max_analog_in_volt / BOARD_MAX_VOLT));
+  if (verbose) {
+    std::cout << "Max analog input voltage: " << max_analog_in_volt << " V" << std::endl;
+    std::cout << "Max analog input voltage bin: " << max_analog_in_volt_bin << std::endl;
+  }
+}
+
+// Legacy device_index-based constructor (for backward compatibility)
+HeinzingerVia16BitDAC::HeinzingerVia16BitDAC(
+    int device_index,
+    double max_voltage,
+    double max_current_param,
+    bool verbose_param,
+    double max_input_voltage)
+    : max_volt(max_voltage),                 // Initialize from parameter
+      max_curr(max_current_param),           // Initialize from parameter
+      verbose(verbose_param),                // Initialize from parameter
+      max_analog_in_volt(max_input_voltage), // Initialize from parameter
+      set_volt_cache(0.0), set_curr_cache(0.0), relay_cache(false),
+      max_analog_in_volt_bin(0), _usbIndex(device_index)
+{
+  Interface.Close(); // ensure nothing is open
+  // Use legacy device_index method
   if (!Interface.Bridge.OpenDevice(0xA0A0, 0x000C, 0, device_index)) {
     Utter("Unable to open USB device #" + std::to_string(device_index));
   }
   if (!Interface) {
     Utter("Unable to open interface to analog PSU interface board.\n");
-    // Consider throwing an exception here for better error handling in Python
   }
 
   Interface.Verbose = this->verbose; // Use the initialized member 'verbose'

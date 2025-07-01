@@ -12,13 +12,13 @@ What This Service Does:
 - Offers both individual PSU control and system status monitoring
 
 Supported PSUs:
-1. Heinzinger PSU (device_index=0):
+1. Heinzinger PSU (USB path @00110000):
    - High voltage: up to 30,000 volts (30kV)
    - Low current: up to 2 milliamps (2mA)
    - Manual operation: no remote relay control
    - API endpoints: /heinzinger/*
 
-2. FUG PSU (device_index=1):
+2. FUG PSU (USB path @00120000):
    - Higher voltage: up to 50,000 volts (50kV)
    - Lower current: up to 0.5 milliamps (0.5mA)
    - Remote control: has relay for on/off switching
@@ -61,10 +61,18 @@ import run_psu_multi as run_psu
 
 app = Flask(__name__)
 
-# PSU configurations
+# Load the C++ PSU control module at startup
+print("Loading C++ PSU control module...")
+if not run_psu.setup_module_path_and_load():
+    print("ERROR: Failed to load C++ module - web service may not work properly")
+    exit(1)
+else:
+    print("✓ C++ module loaded successfully")
+
+# PSU configurations - Updated to use USB path-based identification
 PSU_CONFIGS = {
     "heinzinger": {
-        "device_index": 0,
+        "usb_path": run_psu.USB_PATH_HEINZINGER,  # "@00110000" - Reliable USB path identification
         "max_voltage": 30000.0,  # 30kV
         "max_current": 2.0,      # 2mA
         "max_input_voltage": 10.0,
@@ -72,7 +80,7 @@ PSU_CONFIGS = {
         "has_relay": False  # Heinzinger has no relay - must be turned on manually
     },
     "fug": {
-        "device_index": 1,
+        "usb_path": run_psu.USB_PATH_FUG,         # "@00120000" - Reliable USB path identification
         "max_voltage": 50000.0,  # 50kV
         "max_current": 0.5,      # 0.5mA
         "max_input_voltage": 10.0,
@@ -104,14 +112,14 @@ def get_psu_instance(psu_type):
     
     What This Function Does:
         1. Checks if the requested PSU type is valid (heinzinger or fug)
-        2. Looks up the PSU's configuration (voltage limits, device index, etc.)
+        2. Looks up the PSU's configuration (voltage limits, USB path, etc.)
         3. If PSU is already initialized, returns the existing controller
         4. If PSU is not initialized, attempts to create a new controller
         5. Stores the controller for future use if initialization succeeds
     
     PSU Configuration Details:
         - Each PSU has different voltage/current limits for safety
-        - Each PSU uses a different device_index for hardware communication
+        - Each PSU uses a specific USB path for reliable hardware identification
         - Configuration is defined in the PSU_CONFIGS global dictionary
     
     Error Handling:
@@ -144,9 +152,9 @@ def get_psu_instance(psu_type):
     config = PSU_CONFIGS[psu_type]
     if config["instance"] is None:
         try:
-            # Use the multi-PSU interface to get/create the instance
-            instance = run_psu.get_psu_instance(
-                device_index=config["device_index"],
+            # Use the new USB path-based interface for reliable device identification
+            instance = run_psu.get_psu_instance_by_path(
+                usb_path=config["usb_path"],
                 max_v=config["max_voltage"],
                 max_c=config["max_current"],
                 verb=False,  # Set to True for debugging
@@ -154,7 +162,7 @@ def get_psu_instance(psu_type):
             )
             
             if instance is not None:
-                print(f"{psu_type.upper()} PSU initialized successfully on device {config['device_index']}")
+                print(f"{psu_type.upper()} PSU initialized successfully at USB path {config['usb_path']}")
                 config["instance"] = instance
             else:
                 print(f"ERROR: Failed to initialize {psu_type} PSU - device not found")

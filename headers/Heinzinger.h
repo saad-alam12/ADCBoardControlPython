@@ -3,6 +3,7 @@
 
 #include "AnalogPSU.h" // For the FGAnalogPSUInterface member
 #include <stdint.h>    // For uint16_t etc.
+#include <string>      // For std::string in USB path constructor
 
 // Declaration of the HeinzingerVia16BitDAC class
 class HeinzingerVia16BitDAC {
@@ -30,9 +31,13 @@ private:
   bool update(); // This is a private helper
 
 public:
-  // Constructor
-  HeinzingerVia16BitDAC(int    device_index = 0, double max_voltage = 30000.0, double max_current = 2.0,
+  // Constructor - USB path-based identification
+  HeinzingerVia16BitDAC(const std::string& usb_path, double max_voltage = 30000.0, double max_current = 2.0,
                         bool verbose = false, double max_input_voltage = 10.0);
+  
+  // Legacy constructor for backward compatibility (deprecated)
+  HeinzingerVia16BitDAC(int device_index, double max_voltage, double max_current,
+                        bool verbose, double max_input_voltage);
   
   // Destructor - CRITICAL for USB resource cleanup
   ~HeinzingerVia16BitDAC() {
