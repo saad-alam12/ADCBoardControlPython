@@ -4,6 +4,9 @@ __pycache__/
 *.so
 .DS_Store
 
+# Local Claude instructions (Mac only)
+CLAUDE.md
+
 # Compiled USB utilities
 simple_usb_info
 
