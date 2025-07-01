@@ -3,3 +3,11 @@ __pycache__/
 *.o
 *.so
 .DS_Store
+
+# Compiled USB utilities
+simple_usb_info
+
+# Development test scripts
+test_*.py
+usb_device_info.cpp
+usb_path_detector.cpp
