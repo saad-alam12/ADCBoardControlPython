@@ -1096,9 +1096,9 @@ def status():
         config = PSU_CONFIGS[psu_type]
         result[psu_type] = {
             "initialized": config["instance"] is not None,
-            "device_index": config["device_index"],
-            "max_voltage": config["max_voltage"],
-            "max_current": config["max_current"]
+            "usb_path": config.get("usb_path"),
+            "max_voltage": config.get("max_voltage"),
+            "max_current": config.get("max_current")
         }
         
         # Try to get current readings if initialized

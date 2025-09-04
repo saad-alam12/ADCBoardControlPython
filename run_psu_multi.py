@@ -85,7 +85,7 @@ def setup_module_path_and_load():
         globals()[PYTHON_MODULE_NAME] = module 
         print(f"Successfully imported '{PYTHON_MODULE_NAME}' module.")
         _module_loaded = True
-        return True
+        return True 
     except ImportError as e:
         print(f"ERROR: Failed to import '{PYTHON_MODULE_NAME}' module.")
         print(f"Import error details: {e}")
