@@ -1294,20 +1294,16 @@ def cleanup_resources():
 
 if __name__ == "__main__":
     import atexit
-    import signal
-    
-    # Register cleanup handlers
+
     atexit.register(cleanup_resources)
-    signal.signal(signal.SIGINT, lambda s, f: cleanup_resources())
-    signal.signal(signal.SIGTERM, lambda s, f: cleanup_resources())
-    
+
     print("Starting Dual PSU Service...")
     print("Heinzinger PSU: device_index=0, 30kV/2mA, endpoints: /heinzinger/* (no relay)")
     print("FUG PSU: device_index=1, 50kV/0.5mA, endpoints: /fug/* (with relay)")
     print("Status endpoint: /status")
-    
+
     try:
-        app.run(host="0.0.0.0", port=5001, threaded=True)
+        app.run(host="0.0.0.0", port=5001, threaded=True, use_reloader=False)
     except KeyboardInterrupt:
         print("\nShutting down...")
     finally:

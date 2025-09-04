@@ -114,7 +114,7 @@ bool HeinzingerVia16BitDAC::update() {
 
 // Public method implementations
 bool HeinzingerVia16BitDAC::switch_on() {
-  Interface.SetRelay(true);
+  Interface.SetRelay(false);
   // Original code had: relay = update(); return relay;
   // 'relay' was a local variable in your original main's scope or uninitialized
   // member. Assuming 'update()' returning true means the operation was
@@ -128,7 +128,7 @@ bool HeinzingerVia16BitDAC::switch_on() {
 }
 
 bool HeinzingerVia16BitDAC::switch_off() {
-  Interface.SetRelay(false);
+  Interface.SetRelay(true);
   // Similar logic to switch_on for caching and returning state
   return update();
 }
@@ -141,7 +141,7 @@ bool HeinzingerVia16BitDAC::set_voltage(
   }
 
   // Using this-> to be explicit about members
-  double set_percent_of_max = set_val_param / 0.98 / this->max_volt;
+  double set_percent_of_max = set_val_param / 0.98 / this->max_volt; 
   double required_analog_volt = this->max_analog_in_volt * set_percent_of_max;
   // Ensure required_analog_volt doesn't exceed max_analog_in_volt (could happen
   // if set_val_param is at the edge due to 0.98 factor)
@@ -212,12 +212,12 @@ double HeinzingerVia16BitDAC::read_voltage() {
   uint16_t readout_register_value =
       Interface.ADCB[2]; // Assuming ADCB is populated by Readout()
   // Constants from your original code for conversion:
-  const double adc_conversion_factor = 3.2 * 3.3 * 1.12;
+  const double adc_conversion_factor = 3.2 * 3.3 * 1.12; //equals 11.376
   double readout_analog_volt =
       adc_conversion_factor * readout_register_value / UINT16_MAX;
   // The PSU's analog input for voltage monitoring is 0-10V, representing
   // 0-max_volt
-  double converted_output_volt = this->max_volt * readout_analog_volt / 10.0;
+  double converted_output_volt = this->max_volt * readout_analog_volt / adc_conversion_factor; //previously divide by 10
 
   return converted_output_volt;
 }
@@ -236,7 +236,7 @@ double HeinzingerVia16BitDAC::read_current() {
       adc_conversion_factor * readout_register_value / UINT16_MAX;
   // The PSU's analog input for current monitoring is 0-10V, representing
   // 0-max_curr
-  double converted_output_curr = this->max_curr * readout_analog_volt / 10.0;
+  double converted_output_curr = this->max_curr * readout_analog_volt / adc_conversion_factor; //previously divide by 10
 
   return converted_output_curr;
 }
