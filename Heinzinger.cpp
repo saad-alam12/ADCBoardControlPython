@@ -217,7 +217,7 @@ double HeinzingerVia16BitDAC::read_voltage() {
       adc_conversion_factor * readout_register_value / UINT16_MAX;
   // The PSU's analog input for voltage monitoring is 0-10V, representing
   // 0-max_volt
-  double converted_output_volt = this->max_volt * readout_analog_volt / adc_conversion_factor; //previously divide by 10
+  double converted_output_volt = this->max_volt * readout_analog_volt / 10; //previously divide by 10
 
   return converted_output_volt;
 }
@@ -236,7 +236,7 @@ double HeinzingerVia16BitDAC::read_current() {
       adc_conversion_factor * readout_register_value / UINT16_MAX;
   // The PSU's analog input for current monitoring is 0-10V, representing
   // 0-max_curr
-  double converted_output_curr = this->max_curr * readout_analog_volt / adc_conversion_factor; //previously divide by 10
+  double converted_output_curr = this->max_curr * readout_analog_volt / 10; //previously divide by 10
 
   return converted_output_curr;
 }

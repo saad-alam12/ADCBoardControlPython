@@ -13,8 +13,8 @@ def main():
     
     # Configuration for your PSU
     DEVICE_INDEX = 0        # 0 for first PSU, 1 for second PSU  
-    MAX_VOLTAGE = 50000.0   # 30kV for Heinzinger, 50kV for FUG
-    MAX_CURRENT = 0.5       # 2mA for Heinzinger, 0.5mA for FUG
+    MAX_VOLTAGE = 30000.0   # 30kV for Heinzinger, 50kV for FUG
+    MAX_CURRENT = 2   # 2mA for Heinzinger, 0.5mA for FUG
     
     print(f"Initializing PSU on device {DEVICE_INDEX}...")
     
